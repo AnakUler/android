@@ -30,7 +30,7 @@ object DeviceRegistration {
             callback("Isi API key, App ID, Project ID, dan Sender ID Firebase yang valid terlebih dahulu.")
             return
         }
-        FirebaseMessaging.getInstance(app).token
+        FirebaseMessaging.getInstance().token
             .addOnSuccessListener { token ->
                 executor.execute {
                     val baseUrl = repository.setting(NewsRepository.KEY_BACKEND_URL)
@@ -44,14 +44,14 @@ object DeviceRegistration {
 
     fun refreshRegistration(context: Context) {
         val app = try { initializeFirebase(context) } catch (_: Exception) { null } ?: return
-        FirebaseMessaging.getInstance(app).token.addOnSuccessListener { token -> registerRefreshedToken(context, token) }
+        FirebaseMessaging.getInstance().token.addOnSuccessListener { token -> registerRefreshedToken(context, token) }
     }
 
     fun unregister(context: Context, callback: (String) -> Unit) {
         val repository = NewsRepository(context)
         val app = try { initializeFirebase(context) } catch (_: Exception) { null }
         if (app == null) { callback("Firebase belum dikonfigurasi; tidak dapat mengambil token perangkat."); return }
-        FirebaseMessaging.getInstance(app).token.addOnSuccessListener { token ->
+        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
             executor.execute {
                 val baseUrl = repository.setting(NewsRepository.KEY_BACKEND_URL)
                 val code = repository.setting(NewsRepository.KEY_REGISTRATION_CODE)
@@ -69,3 +69,4 @@ object DeviceRegistration {
         executor.execute { NewsApiClient.registerDevice(baseUrl, code, token) }
     }
 }
+
