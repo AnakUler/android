@@ -27,7 +27,7 @@ async function getAccessToken(env: FcmEnvironment): Promise<string> {
   if (!env.FCM_CLIENT_EMAIL || !env.FCM_PRIVATE_KEY) throw new Error('FCM server credentials are not configured');
   const now = Math.floor(Date.now() / 1000);
   const unsigned = `${encodeJson({ alg: 'RS256', typ: 'JWT' })}.${encodeJson({ iss: env.FCM_CLIENT_EMAIL, scope: 'https://www.googleapis.com/auth/firebase.messaging', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 })}`;
-  const pkcs8 = pemToBytes(env.FCM_PRIVATE_KEY.replace(/\\\\n/g, '\\n'));
+  const pkcs8 = pemToBytes(env.FCM_PRIVATE_KEY.replace(/\\n/g, '\n'));
   // Force an owned ArrayBuffer; recent TypeScript DOM types no longer accept
   // a Uint8Array backed by the broader ArrayBufferLike type here.
   const keyData = new ArrayBuffer(pkcs8.byteLength);
