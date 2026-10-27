@@ -13,6 +13,8 @@ Aplikasi Android native Kotlin untuk memantau berita yang berpotensi relevan ter
 - Validasi freshness; data harga stale/tidak cukup tidak dipakai untuk membuat rentang.
 - Dedup berita dan registrasi perangkat dengan kode registrasi.
 - Cache feed di perangkat, tampilan detail dan tautan sumber.
+- Tampilan Jetpack Compose dengan setup bertahap, tes Worker, status kesiapan push, dan panduan akun baru.
+- Beranda berbahasa Indonesia dengan kategori dampak sederhana serta penjelasan rentang historis empat jam.
 - Tidak ada auto-trading, AI/API berbayar, atau VPS berbayar.
 
 ## Struktur
@@ -20,7 +22,7 @@ Aplikasi Android native Kotlin untuk memantau berita yang berpotensi relevan ter
 - `android/` — source aplikasi Android Kotlin.
 - `worker/` — Cloudflare Worker, klasifikasi, sumber berita/harga, FCM, dan tes.
 - `SETUP_FIREBASE_CLOUDFLARE.md` — konfigurasi akun gratis, rahasia, deploy, dan pembuatan APK.
-- `.github/workflows/android-build.yml` — workflow untuk membangun APK debug di GitHub Actions.
+- `.github/workflows/build-apk.yml` — workflow untuk menguji backend, membangun APK debug, menjalankan unit test, dan mengunggah APK.
 
 ## Status build saat ini
 
@@ -47,6 +49,3 @@ Tes di lingkungan penyusunan menggunakan Node.js native test runner dan lulus. T
 4. XAUS menyajikan spot indikatif, bukan harga eksekusi broker; freshness dan kecukupan sampel harus tetap lolos validasi.
 5. Free tier punya kuota dan ketentuan yang dapat berubah. Biaya Rp0 ditargetkan, bukan dijamin selamanya.
 
-## Unduh APK debug
-
-Build APK otomatis tersedia pada halaman [Releases](https://github.com/AnakUler/android/releases). Unduh berkas `app-debug.apk` dari prerelease terbaru. Build ini belum mengaktifkan push sampai Firebase dan Worker dikonfigurasi.

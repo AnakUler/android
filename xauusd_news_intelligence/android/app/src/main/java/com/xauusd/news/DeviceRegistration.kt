@@ -66,7 +66,10 @@ object DeviceRegistration {
         val baseUrl = repository.setting(NewsRepository.KEY_BACKEND_URL)
         val code = repository.setting(NewsRepository.KEY_REGISTRATION_CODE)
         if (baseUrl.isBlank() || code.isBlank()) return
-        executor.execute { NewsApiClient.registerDevice(baseUrl, code, token) }
+        executor.execute {
+            val result = NewsApiClient.registerDevice(baseUrl, code, token)
+            if (result.isSuccess) repository.saveSetting(NewsRepository.KEY_PUSH_REGISTERED, "true")
+        }
     }
 }
 

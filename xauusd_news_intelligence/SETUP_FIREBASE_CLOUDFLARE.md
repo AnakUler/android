@@ -1,109 +1,108 @@
-# Setup Firebase + Cloudflare (target Rp0)
+# Panduan pemula: Firebase, Cloudflare, dan aplikasi XAUUSD
 
-Panduan ini menyiapkan backend dan push notification. Pembuatan proyek memerlukan akun Firebase/Google dan Cloudflare milik Anda; saya tidak dapat membuat atau mengakses akun tersebut dari lingkungan ini.
+Panduan ini untuk menyiapkan akun baru. Jika project Firebase atau Worker Cloudflare sudah ada, lewati bagian pembuatan akun dan lanjutkan dari bagian yang belum selesai. Saya tidak dapat masuk ke akun Anda dari sini; jangan kirim password, token Cloudflare, atau private key ke chat.
 
-## A. Buat Firebase project gratis
+## Gambaran singkat
 
-1. Buka [Firebase Console](https://console.firebase.google.com/) dan buat project.
-2. Tambahkan Android app dengan package name persis `com.xauusd.news`.
-3. Buka Project settings → General → Your apps dan catat **Web API Key**, **App ID**, **Project ID**, serta **Sender ID / Project number**.
-4. Pada Google Cloud Console untuk project yang sama, aktifkan Firebase Cloud Messaging API dan buat service account yang diberi izin untuk mengirim FCM (role yang sesuai: Firebase Cloud Messaging API Admin). Buat private key JSON service account. **Jangan** taruh JSON service account di folder Android, source control, atau APK.
-5. Pastikan ponsel Android mempunyai Google Play services. Android 13+ perlu mengizinkan notifikasi saat aplikasi memintanya.
+- **Cloudflare Worker** mengambil dan menyimpan data berita, kalender, serta harga indikatif.
+- **Firebase Cloud Messaging (FCM)** mengantar notifikasi Android.
+- Aplikasi hanya memerlukan URL Worker, kode registrasi perangkat, serta empat nilai identitas Firebase. Service-account private key FCM hanya disimpan sebagai Cloudflare secret.
+- Berita tetap dapat dibuka tanpa setup push. Notifikasi hanya digunakan untuk berita `MEDIUM` dan `HIGH`.
 
-## B. Siapkan Cloudflare Worker
+## 1. Buat project Firebase
 
-Prasyarat: Node.js 22+, akun Cloudflare, dan terminal. Perintah dijalankan dari folder `worker/`.
+1. Buka [Firebase Console](https://console.firebase.google.com/) dan buat project baru.
+2. Pada project, pilih **Add app → Android**. Isi package name persis `com.xauusd.news`, lalu daftarkan aplikasi. Unduh `google-services.json` tidak diperlukan untuk aplikasi ini karena konfigurasi Firebase dimasukkan lewat layar setup.
+3. Buka **Project settings → General → Your apps**. Catat **Web API Key**, **App ID**, **Project ID**, dan **Project number** (ini yang dipakai sebagai Sender ID).
+4. Aktifkan **Firebase Cloud Messaging API** pada project Google Cloud yang sama.
+5. Di **Project settings → Service accounts**, buat private key service account JSON. Pastikan email service account mempunyai role **Firebase Cloud Messaging API Admin** pada project target.
+6. Simpan berkas JSON itu di tempat aman di komputer Anda. Jangan masukkan ke folder `android/`, jangan unggah ke GitHub, dan jangan tempel ke aplikasi atau chat. Nanti hanya nilai `project_id`, `client_email`, dan `private_key` yang akan dimasukkan sebagai Cloudflare secrets.
 
-```bash
-cd worker
+> Android harus mempunyai Google Play services untuk FCM. Pada Android 13 atau lebih baru, izinkan notifikasi saat aplikasi meminta izin.
+
+## 2. Siapkan Cloudflare Worker
+
+Gunakan Windows PowerShell atau terminal lain. Pasang Node.js 22 atau lebih baru, unduh/clone source proyek, lalu buka terminal pada folder `xauusd_news_intelligence/worker`.
+
+```powershell
 npm install
 npx wrangler login
 npx wrangler kv namespace create DATA
 ```
 
-Perintah terakhir menampilkan ID KV namespace. Ganti `REPLACE_WITH_KV_NAMESPACE_ID` pada `worker/wrangler.toml` dengan ID tersebut. Jangan memakai placeholder itu saat deploy.
+Perintah KV menampilkan ID namespace. Buka `worker/wrangler.toml`, ganti nilai `REPLACE_WITH_KV_NAMESPACE_ID` pada `[[kv_namespaces]]` dengan ID tersebut, lalu simpan berkas.
 
-Deploy pertama:
+Buat kode registrasi acak di PowerShell:
 
-```bash
-npx wrangler deploy
+```powershell
+$bytes = New-Object byte[] 32
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+$registrationCode = [Convert]::ToHexString($bytes).ToLowerInvariant()
+$registrationCode
 ```
 
-Simpan URL Worker yang diberikan, biasanya `https://xauusd-news-intelligence.<subdomain>.workers.dev`.
+Simpan kode itu di password manager atau catatan pribadi. Masukkan sebagai Cloudflare secret. Ulangi perintah `secret put` untuk setiap nilai; Wrangler meminta nilainya secara interaktif.
 
-Buat kode registrasi acak yang akan Anda masukkan di aplikasi, lalu set sebagai Worker secret. Contoh menghasilkan kode di Linux/macOS:
-
-```bash
-openssl rand -hex 24
+```powershell
 npx wrangler secret put DEVICE_REGISTRATION_CODE
 npx wrangler secret put FCM_PROJECT_ID
 npx wrangler secret put FCM_CLIENT_EMAIL
 npx wrangler secret put FCM_PRIVATE_KEY
-```
-
-Untuk setiap perintah `secret put`, tempel nilai dari akun Anda ketika diminta. `FCM_PRIVATE_KEY` adalah isi private key PEM dari JSON service account, termasuk baris `BEGIN PRIVATE KEY`/`END PRIVATE KEY`. Tidak perlu memasukkan secret ke `.env`, Git, Kotlin, atau APK.
-
-Deploy ulang setelah menambahkan secret:
-
-```bash
 npx wrangler deploy
 ```
 
-Worker mengambil kalender rilis BLS resmi dari `https://www.bls.gov/schedule/news_release/bls.ics` untuk 14 hari ke depan dan memeriksa berita/harga melalui Cron Trigger `*/10 * * * *`. Kalender BLS bukan kalender ekonomi global lengkap. Periksa `https://URL-WORKER/api/health` untuk status konfigurasi. `GET /api/news` menampilkan cache feed; cache akan terisi setelah scheduled run pertama.
+Isi secret sebagai berikut:
 
-### Kuota dan biaya
+- `DEVICE_REGISTRATION_CODE`: kode acak yang baru dibuat.
+- `FCM_PROJECT_ID`: nilai Project ID Firebase.
+- `FCM_CLIENT_EMAIL`: nilai `client_email` di JSON service account.
+- `FCM_PRIVATE_KEY`: hanya nilai `private_key` dari JSON, bukan seluruh isi JSON. Worker menangani baris `\n` pada private key.
 
-- Cloudflare Workers Free mencantumkan kuota request harian, batas CPU per Cron, dan kuota Workers KV. Implementasi menggabungkan daftar perangkat dan daftar dedupe agar mengurangi operasi KV.
-- FCM dipakai untuk mengirim push; tidak ada AI berbayar. Sumber data pihak ketiga dapat mengubah syarat/kuota.
-- Jangan meng-upgrade ke layanan berbayar jika ingin menjaga target Rp0. Jika kuota gratis terlampaui, sistem bisa berhenti memproses sampai kuota reset.
+Secret terenkripsi tidak ditampilkan kembali di dashboard/Wrangler. Jangan menyimpannya sebagai `vars`, `.env` yang di-commit, atau konstanta source code. Cloudflare menyediakan jenis **Secret** di Worker → **Settings → Variables and Secrets**; gunakan jenis itu bila memilih dashboard.
 
-## C. Atur aplikasi Android
+Setelah deploy, simpan URL Worker yang diberikan, biasanya berformat `https://nama-worker.<akun>.workers.dev`. Uji dengan membuka `https://URL-WORKER/api/health`. Respons yang menunjukkan `configured.registrationCode: true` dan `configured.fcm: true` berarti secret backend terdeteksi. Nilai `false` berarti periksa nama dan isi secret di Cloudflare.
 
-Setelah APK terpasang:
+Worker menjalankan pemeriksaan sumber setiap 10 menit. `GET /api/news` dapat kosong sampai pemeriksaan terjadwal pertama menyelesaikan pengambilan data. Kalender yang tersedia saat ini berasal dari rilis BLS AS; ini bukan kalender ekonomi global lengkap.
 
-1. Buka **Pengaturan**.
-2. Isi URL Worker HTTPS.
-3. Isi kode `DEVICE_REGISTRATION_CODE` yang sama dengan secret Worker.
-4. Isi Web API Key, App ID, Project ID, dan Sender ID dari Firebase.
-5. Tekan **Simpan pengaturan**, lalu **Hubungkan Firebase dan daftarkan perangkat**.
-6. Kembali ke feed dan tekan **Perbarui berita**. Tunggu scheduled run pertama.
-7. Uji push menggunakan berita MEDIUM/HIGH baru atau FCM test send dari Firebase Console. Berita NORMAL memang tidak mengirim push.
+## 3. Hubungkan aplikasi
 
-Jika konfigurasi Firebase diubah setelah Firebase SDK diinisialisasi, tutup paksa lalu buka kembali aplikasi sebelum mencoba koneksi lagi. Token FCM disimpan di backend untuk pengiriman; kode registrasi hanya dipakai saat registrasi perangkat.
+1. Pasang APK dan buka **Penyiapan aplikasi**. Anda dapat memilih **Nanti saja** untuk melihat feed sebelum konfigurasi selesai.
+2. Langkah **Cloudflare Worker**: tempel URL Worker HTTPS dan kode `DEVICE_REGISTRATION_CODE` yang sama dengan secret. Tekan **Tes koneksi Worker**.
+3. Langkah **Firebase**: masukkan Web API Key, App ID, Project ID, dan Sender ID dari Project settings Firebase.
+4. Langkah **Peringatan**: izinkan notifikasi, lalu tekan **Hubungkan Firebase dan daftarkan perangkat**.
+5. Kembali ke beranda dan tekan **Perbarui berita**. Status Worker, konfigurasi Firebase, pendaftaran push, jumlah berita, jadwal, dan waktu pembaruan tampil di sana.
 
-## D. Build APK debug
+Layar **Pengaturan** dapat dibuka kapan saja untuk memperbaiki konfigurasi atau menghapus perangkat dari daftar push. Mengubah project Firebase mungkin memerlukan aplikasi ditutup paksa lalu dibuka kembali agar SDK memuat ulang konfigurasi.
 
-### Melalui Android Studio
+## 4. Cara membaca aplikasi
 
-1. Buka Android Studio dan pilih **Open** pada folder `android/`.
-2. Gunakan JDK 17 atau yang kompatibel dengan Android Gradle Plugin 8.13.x.
-3. Izinkan Gradle mengunduh dependency, lalu jalankan task `app → Tasks → build → assembleDebug`.
-4. APK output: `android/app/build/outputs/apk/debug/app-debug.apk`.
+- **Dampak tinggi/sedang** adalah tingkat relevansi berita menurut aturan klasifikasi; itu bukan prediksi arah.
+- Buka kartu berita untuk membaca alasan, skenario jika emas naik, dan skenario jika emas turun.
+- **Rentang historis 4 jam** dihitung dari pergerakan harga pada sampel lampau jika datanya cukup dan masih baru. Rentang itu bukan target harga, probabilitas terkalibrasi, atau jaminan hasil.
+- Harga spot global adalah harga indikatif, bukan harga eksekusi broker Anda.
+- Kalender ekonomi yang terlihat mengikuti jadwal yang disediakan Worker.
+- Jika Worker atau Firebase belum siap, aplikasi tetap dapat menampilkan feed cache yang tersimpan.
 
-### Melalui terminal dengan Gradle 8.13
+## 5. Pemecahan masalah
 
-Pasang Android SDK dan platform `android-36`, terima lisensi, dan atur `ANDROID_HOME`/`local.properties`. Lalu:
+| Gejala | Periksa |
+|---|---|
+| Tes Worker gagal | URL harus lengkap dan memakai `https://`; periksa Worker sudah di-deploy dan koneksi internet tersedia. |
+| `registrationCode` bernilai `false` pada `/api/health` | Secret `DEVICE_REGISTRATION_CODE` belum ditambahkan atau namanya salah. |
+| Worker tersambung tetapi registrasi perangkat ditolak | Kode di aplikasi harus sama persis dengan secret Cloudflare. |
+| `fcm` bernilai `false` | Lengkapi tiga secret FCM di Cloudflare, lalu deploy ulang. |
+| Firebase tidak menghasilkan token | Periksa empat nilai client Firebase, API FCM aktif, koneksi internet, dan Google Play services pada ponsel. |
+| Tidak ada notifikasi | Periksa izin Android, status push di beranda, secret FCM, dan tunggu berita baru berkategori MEDIUM/HIGH. Berita rutin tidak memicu push. |
+| Feed masih kosong | Tunggu satu siklus terjadwal Worker, lalu tekan Perbarui berita. Periksa `/api/health` dan dashboard Cloudflare untuk error Worker. |
 
-```bash
-cd android
-gradle assembleDebug
-gradle testDebugUnitTest
-```
+## Keamanan dan biaya
 
-### GitHub Actions
+APK yang tersedia saat ini adalah **debug build**, bukan APK production yang ditandatangani dengan kunci rilis Anda. Aplikasi tidak perlu menerima private key Firebase server atau token API Cloudflare. Jangan membagikan kredensial akun. Kuota dan harga layanan gratis dapat berubah; periksa dashboard layanan bila penggunaan mendekati limit.
 
-Push source ini ke repository GitHub milik Anda, lalu buka tab Actions dan jalankan workflow **Build Android APK**. Setelah sukses, unduh artifact `xauusd-news-debug-apk`. Workflow hanya menghasilkan artifact; itu tidak men-deploy Worker dan tidak mengaktifkan Firebase otomatis.
+## Referensi resmi
 
-## E. Sumber dan cara membaca hasil
+- [Firebase: menyiapkan FCM di Android](https://firebase.google.com/docs/cloud-messaging/android/get-started)
+- [Firebase: mengirim melalui HTTP v1 dan service account](https://firebase.google.com/docs/cloud-messaging/send/v1-api)
+- [Cloudflare Workers: menyimpan secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
+- [Cloudflare Wrangler: perintah secret put](https://developers.cloudflare.com/workers/wrangler/commands/workers/)
 
-- Berita: GDELT, feed press release Federal Reserve, dan feed BLS.
-- Harga: XAUS global indicative spot/intraday. Bukan kuotasi eksekusi broker.
-- Rentang: Q10/Q90 dari return historis yang berjarak empat jam berdasarkan timestamp aktual. Jika data stale atau sampel kurang, zona tidak ditampilkan dan alert tetap dapat dikirim.
-- `HIGH`/`MEDIUM` adalah prioritas aturan heuristik, bukan probabilitas berita akan menggerakkan pasar.
-
-## Troubleshooting
-
-- **Tidak ada berita:** periksa `/api/health`, lalu `GET /api/news`; Cron mungkin belum berjalan atau sumber gagal.
-- **Tidak ada push:** periksa izin notifikasi Android, Google Play services, konfigurasi Firebase, Worker secrets, kode registrasi, dan status registrasi perangkat.
-- **Harga tidak tersedia:** Worker sengaja tidak membuat zona dari data stale/kurang.
-- **Deploy gagal:** pastikan ID KV bukan placeholder, `wrangler login` aktif, dan secret sudah diset.
