@@ -8,7 +8,7 @@ on:
       - '.github/workflows/build-apk.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -67,3 +67,16 @@ jobs:
           path: xauusd_news_intelligence/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
+
+      - name: Publish public APK prerelease
+        if: startsWith(github.event.head_commit.message, 'Publish APK asset')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-debug-${{ github.sha }}
+          name: XAUUSD News Intelligence debug APK ${{ github.sha }}
+          body: Automated debug APK build. Firebase and Cloudflare configuration is still required for push notifications.
+          prerelease: true
+          make_latest: false
+          files: xauusd_news_intelligence/android/app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
