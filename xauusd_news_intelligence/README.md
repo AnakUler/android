@@ -46,3 +46,7 @@ Tes di lingkungan penyusunan menggunakan Node.js native test runner dan lulus. T
 3. Zona harga Q10/Q90 adalah rentang perubahan historis empat jam, bukan prediksi, target pasti, atau probabilitas terkalibrasi.
 4. XAUS menyajikan spot indikatif, bukan harga eksekusi broker; freshness dan kecukupan sampel harus tetap lolos validasi.
 5. Free tier punya kuota dan ketentuan yang dapat berubah. Biaya Rp0 ditargetkan, bukan dijamin selamanya.
+
+## Unduh APK debug
+
+Build APK otomatis tersedia pada halaman [Releases](https://github.com/AnakUler/android/releases). Unduh berkas `app-debug.apk` dari prerelease terbaru. Build ini belum mengaktifkan push sampai Firebase dan Worker dikonfigurasi.
