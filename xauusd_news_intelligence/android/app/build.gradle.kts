@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
@@ -18,7 +19,10 @@ android {
         testInstrumentationRunner = "android.test.runner.AndroidJUnitRunner"
     }
 
-    buildFeatures { buildConfig = true }
+    buildFeatures {
+        buildConfig = true
+        compose = true
+    }
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -40,8 +44,15 @@ kotlin {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.17.0")
+    implementation("androidx.activity:activity-compose:1.12.4")
+    implementation(platform("androidx.compose:compose-bom:2026.06.01"))
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    debugImplementation("androidx.compose.ui:ui-tooling")
     implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
     implementation("com.google.firebase:firebase-messaging")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.15.1")
 }
+

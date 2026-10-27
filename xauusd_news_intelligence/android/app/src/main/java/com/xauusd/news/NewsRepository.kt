@@ -20,5 +20,7 @@ class NewsRepository(context: Context) {
         const val KEY_FIREBASE_APP_ID = "firebase_app_id"
         const val KEY_FIREBASE_PROJECT_ID = "firebase_project_id"
         const val KEY_FIREBASE_SENDER_ID = "firebase_sender_id"
+        const val KEY_PUSH_REGISTERED = "push_registered"
     }
 }
+
